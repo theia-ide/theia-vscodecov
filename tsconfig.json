@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es5",
+    "strict": true,
+    "sourceMap": false,
+    "baseUrl": ".",
+    "outDir": "lib",
+    "rootDir": "src",
+    "resolveJsonModule": true,
+    "downlevelIteration": true,
+    "lib": ["es2015"]
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@theia/vscode-coverage",
+  "version": "1.0.0",
+  "main": "lib/index.js",
+  "license": "MIT",
+  "files": [
+    "lib"
+  ],
+  "bin": {
+    "theia-vscodecov": "lib/index.js"
+  },
+  "scripts": {
+    "prepare": "npm run clean && npm run compile",
+    "compile": "tsc",
+    "watch": "tsc -w",
+    "clean": "rimraf lib"
+  },
+  "devDependencies": {
+    "@types/node": "^8.0.0",
+    "@types/yargs": "^12.0.10",
+    "rimraf": "^2.6.3"
+  },
+  "dependencies": {
+    "@theia/plugin": "next",
+    "jsonc-parser": "^2.0.3",
+    "typescript": "latest",
+    "yargs": "^13.2.2"
+  }
+}
