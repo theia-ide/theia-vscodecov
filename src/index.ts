@@ -98,10 +98,17 @@ const symbols = new Set<string>();
 const missingSymbols = new Set<string>();
 const typeChecker = program.getTypeChecker();
 
-const getCommand: (expression: ts.Expression) => string | undefined = expression => {
-    if (expression.kind === ts.SyntaxKind.StringLiteral) {
-        const text = expression.getText();
+const getStringValue: (node: ts.Node) => string | undefined = node => {
+    if (ts.isStringLiteralLike(node)) {
+        const text = node.getText();
         return text.substr(1, text.length - 2);
+    }
+}
+
+const getCommand: (expression: ts.Expression) => string | undefined = expression => {
+    const value = getStringValue(expression)
+    if (value) {
+        return value;
     }
     const type = typeChecker.getTypeAtLocation(expression);
     if (type && type.isStringLiteral()) {
@@ -109,8 +116,24 @@ const getCommand: (expression: ts.Expression) => string | undefined = expression
     }
 }
 
+const pushCommand = (command: string) => {
+    if (theiaCommands.has(command)) {
+        commands.add(command);
+    } else {
+        missingCommands.add(command);
+    }
+}
+
 const visit = (node: ts.Node) => {
     try {
+        const value = getStringValue(node);
+        if (value) {
+            for (const prefix of ['vscode.', 'workbench.', 'editor.', 'history.', 'search.', 'markdown.', 'actions.']) {
+                if (value.startsWith(prefix)) {
+                    pushCommand(value);
+                }
+            }
+        }
         const type = typeChecker.getTypeAtLocation(node);
         const symbol = type.getSymbol();
         if (symbol) {
@@ -123,11 +146,7 @@ const visit = (node: ts.Node) => {
                     const argument = (node.parent as ts.CallExpression).arguments[0];
                     const command = getCommand(argument);
                     if (command) {
-                        if (theiaCommands.has(command)) {
-                            commands.add(command);
-                        } else {
-                            missingCommands.add(command);
-                        }
+                        pushCommand(command);
                     } else {
                         const {
                             line,
