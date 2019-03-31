@@ -21,6 +21,11 @@ const argv = yargs
         default: "tsconfig.json",
         description: "a package relative tsconfig path"
     })
+    .option("manifest", {
+        alias: "p",
+        default: "package.json",
+        description: "a package relative package.json path"
+    })
     .help().argv;
 
 if (!fs.existsSync(argv.package)) {
@@ -42,6 +47,13 @@ const tsconfigPath = path.join(argv.package, argv.config);
 if (!fs.existsSync(tsconfigPath)) {
     console.error(
         `"${tsconfigPath}" tsconfig path should exist, use "config" option to specify a package relative path`
+    );
+    process.exit(1);
+}
+const manifestPath = path.join(argv.package, argv.manifest);
+if (!fs.existsSync(manifestPath)) {
+    console.error(
+        `"${manifestPath}" package.json path should exist, use "manifest" option to specify a package relative path`
     );
     process.exit(1);
 }
@@ -116,7 +128,20 @@ const getCommand: (expression: ts.Expression) => string | undefined = expression
     }
 }
 
+const manifest = require(manifestPath);
+const manifestCommands = new Set<string>();
+if (Array.isArray(manifest.contributes && manifest.contributes.commands)) {
+    for (const command of manifest.contributes.commands) {
+        if (typeof command === 'object' && ('command' in command) && typeof command['command'] === 'string') {
+            manifestCommands.add(command['command']);
+        }
+    }
+}
+
 const pushCommand = (command: string) => {
+    if (manifestCommands.has(command)) {
+        return;
+    }
     if (theiaCommands.has(command)) {
         commands.add(command);
     } else {
@@ -198,6 +223,7 @@ if (!symbols.size && !missingSymbols.size) {
     console.log(
         JSON.stringify(
             {
+                manifestCommands: Array.from(manifestCommands).sort(),
                 usedSymbols: Array.from(symbols).sort(),
                 usedCommands: Array.from(commands).sort(),
                 missingSymbols: Array.from(missingSymbols).sort(),
