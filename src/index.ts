@@ -66,19 +66,34 @@ const theiaProgram = ts.createProgram({
 const theiaFile = theiaProgram.getSourceFile(theiaFileName)!;
 const theiaTypeChecker = theiaProgram.getTypeChecker();
 const theiaSymbols = new Set<string>();
-const visitTheia = (node: ts.Node) => {
+
+const pushTheiaSymbol = (symbol: ts.Symbol) => {
+    const qualifiedName = theiaTypeChecker.getFullyQualifiedName(symbol);
+    if (qualifiedName.startsWith('"@theia/plugin".') && !theiaSymbols.has(qualifiedName)) {
+        theiaSymbols.add(qualifiedName);
+        return true;
+    }
+    return false;
+}
+
+const visitTheiaType = (node: ts.Node, type: ts.Type = theiaTypeChecker.getTypeAtLocation(node)) => {
     try {
-        const type = theiaTypeChecker.getTypeAtLocation(node);
         const symbol = type.getSymbol();
-        if (symbol) {
-            const qualifiedName = theiaTypeChecker.getFullyQualifiedName(symbol);
-            if (
-                qualifiedName.startsWith('"@theia/plugin".') &&
-                !theiaSymbols.has(qualifiedName)
-            ) {
-                theiaSymbols.add(qualifiedName);
+        if (symbol && pushTheiaSymbol(symbol)) {
+            for (const propertySymbol of theiaTypeChecker.getPropertiesOfType(type)) {
+                if (pushTheiaSymbol(propertySymbol)) {
+                    visitTheiaType(node, theiaTypeChecker.getTypeOfSymbolAtLocation(propertySymbol, node));
+                }
             }
         }
+    } catch {
+        /* no-op */
+    }
+}
+
+const visitTheia = (node: ts.Node) => {
+    try {
+        visitTheiaType(node);
     } catch {
         /* no-op */
     }
@@ -149,6 +164,27 @@ const pushCommand = (command: string) => {
     }
 }
 
+const getTypeFullyQualifiedName: (node: ts.Node) => string | undefined = node => {
+    const type = typeChecker.getTypeAtLocation(node);
+    const symbol = type.getSymbol();
+    if (symbol) {
+        const qualifiedName = typeChecker.getFullyQualifiedName(symbol);
+        if (qualifiedName.startsWith('"vscode".')) {
+            return qualifiedName;
+        }
+    }
+}
+
+const getFullyQualifiedName: (node: ts.Node) => string | undefined = node => {
+    if (ts.isPropertyAccessExpression(node)) {
+        const qualifiedName = getTypeFullyQualifiedName(node.expression);
+        if (qualifiedName) {
+            return `${qualifiedName}.${node.name.escapedText}`;
+        }
+    }
+    return getTypeFullyQualifiedName(node);
+}
+
 const visit = (node: ts.Node) => {
     try {
         const value = getStringValue(node);
@@ -159,49 +195,45 @@ const visit = (node: ts.Node) => {
                 }
             }
         }
-        const type = typeChecker.getTypeAtLocation(node);
-        const symbol = type.getSymbol();
-        if (symbol) {
-            const qualifiedName = typeChecker.getFullyQualifiedName(symbol);
-            if (qualifiedName.startsWith('"vscode".')) {
-                if (
-                    qualifiedName.endsWith(".executeCommand") &&
-                    node.parent.kind === ts.SyntaxKind.CallExpression
-                ) {
-                    const argument = (node.parent as ts.CallExpression).arguments[0];
-                    const command = getCommand(argument);
-                    if (command) {
-                        pushCommand(command);
-                    } else {
-                        const {
-                            line,
-                            character
-                        } = argument
-                            .getSourceFile()
-                            .getLineAndCharacterOfPosition(argument.pos);
-                        dynamicCommanCalls.add(
-                            `${argument.getText()} (${
-                            argument.getSourceFile().fileName
-                            } ${line}:${character})`
-                        );
-                    }
+        const qualifiedName = getFullyQualifiedName(node);
+        if (qualifiedName) {
+            if (
+                qualifiedName.endsWith(".executeCommand") &&
+                node.parent.kind === ts.SyntaxKind.CallExpression
+            ) {
+                const argument = (node.parent as ts.CallExpression).arguments[0];
+                const command = getCommand(argument);
+                if (command) {
+                    pushCommand(command);
+                } else {
+                    const {
+                        line,
+                        character
+                    } = argument
+                        .getSourceFile()
+                        .getLineAndCharacterOfPosition(argument.pos);
+                    dynamicCommanCalls.add(
+                        `${argument.getText()} (${
+                        argument.getSourceFile().fileName
+                        } ${line}:${character})`
+                    );
                 }
-                if (!symbols.has(qualifiedName) && !missingSymbols.has(qualifiedName)) {
-                    let theiaSymbolName = qualifiedName.replace(
-                        '"vscode"',
-                        '"@theia/plugin"'
-                    );
-                    theiaSymbolName = theiaSymbolName.replace(
-                        "ExtensionContext",
-                        "PluginContext"
-                    );
-                    theiaSymbolName = theiaSymbolName.replace("Extension", "Plugin");
-                    theiaSymbolName = theiaSymbolName.replace("extensions", "plugins");
-                    if (theiaSymbols.has(theiaSymbolName)) {
-                        symbols.add(qualifiedName);
-                    } else {
-                        missingSymbols.add(qualifiedName);
-                    }
+            }
+            if (!symbols.has(qualifiedName) && !missingSymbols.has(qualifiedName)) {
+                let theiaSymbolName = qualifiedName.replace(
+                    '"vscode"',
+                    '"@theia/plugin"'
+                );
+                theiaSymbolName = theiaSymbolName.replace(
+                    "ExtensionContext",
+                    "PluginContext"
+                );
+                theiaSymbolName = theiaSymbolName.replace("Extension", "Plugin");
+                theiaSymbolName = theiaSymbolName.replace("extensions", "plugins");
+                if (theiaSymbols.has(theiaSymbolName)) {
+                    symbols.add(qualifiedName);
+                } else {
+                    missingSymbols.add(qualifiedName);
                 }
             }
         }
