@@ -224,12 +224,12 @@ const visit = (node: ts.Node) => {
                     '"vscode"',
                     '"@theia/plugin"'
                 );
-                theiaSymbolName = theiaSymbolName.replace(
-                    "ExtensionContext",
-                    "PluginContext"
-                );
+                const context = theiaSymbolName.indexOf('ExtensionContext') !== -1;
                 theiaSymbolName = theiaSymbolName.replace("Extension", "Plugin");
                 theiaSymbolName = theiaSymbolName.replace("extensions", "plugins");
+                if (!context) {
+                    theiaSymbolName = theiaSymbolName.replace("extension", "plugin");
+                }
                 if (theiaSymbols.has(theiaSymbolName)) {
                     symbols.add(qualifiedName);
                 } else {
