@@ -15,7 +15,7 @@ Run in order to build and install locally:
 
 ## Use
 
-Run from VS Code extendion directory:
+Run from VS Code extension directory:
 
     npx theia-vscodecov
 
