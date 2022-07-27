@@ -1,3 +1,7 @@
+# THIS REPOSITORY HAS BEEN MOVED TO [ECLIPSE-THEIA](https://github.com/eclipse-theia/theia-vscodecov)
+
+---
+
 # theia-vscodecov
 
 Test VS Code API coverage against Theia for any VS Code extension
